@@ -13,6 +13,10 @@ module Celluloid
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
           begin
             @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
+            if uri.scheme == "wss"
+              @socket = Celluloid::IO::SSLSocket.new(@socket)
+              @socket.connect
+            end
           rescue => e
             handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
             terminate
