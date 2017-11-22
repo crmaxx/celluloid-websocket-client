@@ -18,6 +18,7 @@ module Celluloid
         def initialize(url, handler)
           @url = url
           @handler = handler
+          start
         end
 
         def start
