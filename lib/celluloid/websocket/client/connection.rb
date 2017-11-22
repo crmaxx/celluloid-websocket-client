@@ -9,6 +9,7 @@ module Celluloid
 
         PART_SIZE = 1024
 
+        def_delegator :@client, :start, :start
         def_delegators :@client, :text, :binary, :ping, :close, :protocol
 
         attr_reader :url
