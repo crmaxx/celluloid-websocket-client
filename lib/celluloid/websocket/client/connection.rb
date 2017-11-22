@@ -5,6 +5,7 @@ module Celluloid
     module Client
       class Connection
         include Celluloid::IO
+        include Celluloid::Logger
         extend Forwardable
 
         PART_SIZE = 1024
@@ -20,6 +21,7 @@ module Celluloid
         end
 
         def start
+          debug("Celluloid::WebSocket::Client::Connection #{@socket.closed?}")
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
 
