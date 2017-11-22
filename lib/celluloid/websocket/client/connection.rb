@@ -21,7 +21,7 @@ module Celluloid
         end
 
         def start
-          debug("Celluloid::WebSocket::Client::Connection #{@socket.closed?}")
+          debug("Celluloid::WebSocket::Client::Connection start")
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
 
