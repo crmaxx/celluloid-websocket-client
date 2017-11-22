@@ -33,7 +33,6 @@ module Celluloid
             @socket.connect
           rescue => e
             @handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
-            terminate
           end
 
           @client = ::WebSocket::Driver.client(self)
