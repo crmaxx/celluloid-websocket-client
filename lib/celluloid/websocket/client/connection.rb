@@ -19,6 +19,8 @@ module Celluloid
           @url = url
           @handler = handler
           start
+        rescue => e
+          debug "new: \n" + e.backtrace.join("\n")
         end
 
         def start
@@ -39,6 +41,8 @@ module Celluloid
           @client = ::WebSocket::Driver.client(self)
 
           async.run
+        rescue => e
+          debug "start: \n" + e.backtrace.join("\n")
         end
 
         def run
@@ -67,10 +71,14 @@ module Celluloid
               break
             end
           end
+        rescue => e
+          debug "run: \n" + e.backtrace.join("\n")
         end
 
         def write(buffer)
           @socket.write(buffer)
+        rescue => e
+          debug "write: \n" + e.backtrace.join("\n")
         end
       end
     end
