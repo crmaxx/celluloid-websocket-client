@@ -7,26 +7,37 @@ module Celluloid
         include Celluloid::IO
         extend Forwardable
 
+        PART_SIZE = 1024
+
+        def_delegators :@client, :text, :binary, :ping, :close, :protocol
+
+        attr_reader :url
+
         def initialize(url, handler)
           @url = url
+          @handler = handler
+          start
+        end
+
+        def start
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
+
+          @socket.close rescue nil
+
           begin
             @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
-            if uri.scheme == "wss"
-              @socket = Celluloid::IO::SSLSocket.new(@socket)
-              @socket.connect
-            end
+            @socket = Celluloid::IO::SSLSocket.new(@socket) if uri.scheme == "wss"
+            @socket.connect
           rescue => e
-            handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
+            @handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
             terminate
           end
+
           @client = ::WebSocket::Driver.client(self)
-          @handler = handler
 
           async.run
         end
-        attr_reader :url
 
         def run
           @client.on('open') do |_event|
@@ -49,21 +60,20 @@ module Celluloid
 
           loop do
             begin
-              @client.parse(@socket.readpartial(1024))
+              @client.parse(@socket.readpartial(PART_SIZE))
             rescue EOFError
               break
             end
           end
+
+          @socket.close rescue nil
+          @handler.offline! if @handler.respond_to?(:offline!)
         end
 
-        def_delegators :@client, :text, :binary, :ping, :close, :protocol
-
         def write(buffer)
-          @socket.write buffer
+          @socket.write(buffer)
         end
       end
     end
   end
 end
-
-
