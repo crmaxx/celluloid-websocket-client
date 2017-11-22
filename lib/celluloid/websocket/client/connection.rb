@@ -25,8 +25,6 @@ module Celluloid
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
 
-          @socket.close rescue nil
-
           begin
             @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
             if uri.scheme == "wss"
@@ -68,9 +66,6 @@ module Celluloid
               break
             end
           end
-
-          @socket.close rescue nil
-          @handler.offline! if @handler.respond_to?(:offline!)
         end
 
         def write(buffer)
