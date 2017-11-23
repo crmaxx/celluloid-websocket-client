@@ -1,54 +1,91 @@
 require 'forwardable'
+require 'json'
 
 module Celluloid
   module WebSocket
     module Client
       class Connection
         include Celluloid::IO
+        include Celluloid::Logger
         extend Forwardable
+
+        PART_SIZE = 1024
+
+        def_delegator :@client, :start, :start
+        def_delegators :@client, :text, :binary, :ping, :close, :protocol
+
+        attr_reader :url
 
         def initialize(url, handler)
           @url = url
+          @handler = handler
+          start
+        rescue => e
+          debug "new: \n" + e.backtrace.join("\n")
+        end
+
+        def start
+          debug("Celluloid::WebSocket::Client::Connection start")
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
-          @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
+          @socket.close rescue nil
+          begin
+            @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
+            if uri.scheme == "wss"
+              @socket = Celluloid::IO::SSLSocket.new(@socket)
+              @socket.connect
+            end
+          rescue => e
+            @handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
+            debug "socket: \n" + e.backtrace.join("\n")
+            terminate
+          end
+
           @client = ::WebSocket::Driver.client(self)
-          @handler = handler
 
           async.run
+        rescue => e
+          debug "start: \n" + e.backtrace.join("\n")
         end
-        attr_reader :url
 
         def run
-          @client.on('open') do |event|
+          @client.on('open') do |_event|
             @handler.async.on_open if @handler.respond_to?(:on_open)
           end
+
           @client.on('message') do |event|
             @handler.async.on_message(event.data) if @handler.respond_to?(:on_message)
           end
+
           @client.on('close') do |event|
             @handler.async.on_close(event.code, event.reason) if @handler.respond_to?(:on_close)
+          end
+
+          @client.on('error') do |event|
+            @handler.async.on_error(event.code, event.reason) if @handler.respond_to?(:on_error)
           end
 
           @client.start
 
           loop do
             begin
-              @client.parse(@socket.readpartial(1024))
+              @client.parse(@socket.readpartial(PART_SIZE))
             rescue EOFError
+              debug "loop: \n #{e.backtrace.join("\n")} #{e.class} #{e.message}"
               break
             end
           end
+          @socket.close rescue nil
+        rescue => e
+          debug "run: \n #{e.backtrace.join("\n")} #{e.class} #{e.message}"
         end
 
-        def_delegators :@client, :text, :binary, :ping, :close, :protocol
-
         def write(buffer)
-          @socket.write buffer
+          @socket.write(buffer)
+        rescue => e
+          debug "write: \n" + e.backtrace.join("\n")
         end
       end
     end
   end
 end
-
-
