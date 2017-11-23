@@ -1,4 +1,5 @@
 require 'forwardable'
+require 'json'
 
 module Celluloid
   module WebSocket
@@ -27,7 +28,7 @@ module Celluloid
           debug("Celluloid::WebSocket::Client::Connection start")
           uri = URI.parse(url)
           port = uri.port || (uri.scheme == "ws" ? 80 : 443)
-
+          @socket.close rescue nil
           begin
             @socket = Celluloid::IO::TCPSocket.new(uri.host, port)
             if uri.scheme == "wss"
@@ -37,6 +38,7 @@ module Celluloid
           rescue => e
             @handler.async.on_error(::WebSocket::Driver::Hybi::ERRORS[:protocol_error], e.to_s)
             debug "socket: \n" + e.backtrace.join("\n")
+            terminate
           end
 
           @client = ::WebSocket::Driver.client(self)
@@ -69,11 +71,13 @@ module Celluloid
             begin
               @client.parse(@socket.readpartial(PART_SIZE))
             rescue EOFError
+              debug "loop: \n #{e.backtrace.join("\n")} #{e.class} #{e.message}"
               break
             end
           end
+          @socket.close rescue nil
         rescue => e
-          debug "run: \n" + e.backtrace.join("\n")
+          debug "run: \n #{e.backtrace.join("\n")} #{e.class} #{e.message}"
         end
 
         def write(buffer)
